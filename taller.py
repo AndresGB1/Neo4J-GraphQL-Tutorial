@@ -33,7 +33,7 @@ def get_db():
 
 
 
-#Post Comprador
+#1Post Comprador
 #atributo nombre
 @app.route("/comprador", methods=['POST'])
 def post_comprador():
@@ -55,7 +55,7 @@ def get_comprador():
     result = db.run("MATCH (a:Comprador) RETURN a.nombre AS nombre")
     return Response(dumps(result.data()),  mimetype='application/json')
 
-#Post Vendedor
+#2Post Vendedor
 #atributo nombre
 @app.route("/vendedor", methods=['POST'])
 def post_vendedor():
@@ -78,7 +78,7 @@ def get_vendedores():
     return Response(dumps(result.data()),  mimetype='application/json')
 
 
-#Post producto
+#3Post producto asociado a un vendedor
 #atributo nombre categoria 
 @app.route("/producto", methods=['POST'])
 def post_producto():
@@ -88,7 +88,9 @@ def post_producto():
     db = get_db()
     nombre = request.json['nombre']
     categoria = request.json['categoria']
+    vendedor = request.json['vendedor']
     db.run("CREATE (a:Producto {nombre: $nombre, categoria: $categoria})", nombre=nombre, categoria=categoria)
+    db.run("MATCH (a:Vendedor {nombre: $nombre}) CREATE (a)<-[:VENDIDO_POR]-(b:Producto {nombre: $nombre, categoria: $categoria})", nombre=nombre, categoria=categoria)
     return Response(status=201)
 
 #get productos
@@ -101,33 +103,7 @@ def get_productos():
     result = db.run("MATCH (a:Producto) RETURN a.nombre AS nombre, a.categoria AS categoria")
     return Response(dumps(result.data()),  mimetype='application/json')
 
-
-#producto asociado a un vendedor.
-@app.route("/producto_with_vendedor", methods=['POST'])
-def post_producto_with_vendedor():
-    """
-    Relacion producto con vendedor
-    """
-    print("entro")
-    print("Producto con vendedor")
-    db = get_db()
-    nombre_producto = request.json['producto']
-    nombre_vendedor = request.json['vendedor']
-    db.run("MATCH (a:Producto {nombre: $nombre_producto}), (b:Vendedor {nombre: $nombre_vendedor}) CREATE (a)-[:VENDIDO_POR]->(b)", nombre_producto=nombre_producto, nombre_vendedor=nombre_vendedor)
-    return Response(status=201)
-
-#Get productos asociados a un vendedor
-@app.route("/productos_with_vendedor", methods=['GET'])
-def get_productos_with_vendedor():
-    """
-    Retorna todos los productos asociados a un vendedor
-    """
-    db = get_db()
-    nombre_vendedor = request.args.get('nombre_vendedor')
-    result = db.run("MATCH (a:Producto)-[:VENDIDO_POR]->(b:Vendedor {nombre: $nombre_vendedor}) RETURN a.nombre AS nombre, a.categoria AS categoria", nombre_vendedor=nombre_vendedor)
-    return Response(dumps(result.data()),  mimetype='application/json')
-
-#Realizar una compra de un producto por parte de un comprador.
+#4Realizar una compra de un producto por parte de un comprador.
 @app.route("/comprar", methods=['POST'])
 def post_comprar():
     db = get_db()
@@ -136,7 +112,7 @@ def post_comprar():
     db.run("MATCH (a:Producto {nombre: $nombre_producto}), (b:Comprador {nombre: $nombre_comprador}) CREATE (a)-[:COMPRADO_POR]->(b)", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador)
     return Response(status=201)
 
-#Recomendar un producto.
+#5Recomendar un producto.
 #Un comprador relaciona la RECOMIENDA un producto con atributo calificación siendo este un entero entre 1 y 5.
 #Metodo documentado
 @app.route("/recomendar", methods=['POST'])
@@ -151,7 +127,7 @@ def post_recomendar():
     db.run("MATCH (a:Producto {nombre: $nombre_producto}), (b:Comprador {nombre: $nombre_comprador}) CREATE (b)-[:RECOMIENDA {calificacion: $calificacion}]->(a)", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador, calificacion=calificacion)
     return Response(status=201)
 
-#Retornar el TOP 5 de los productos más vendidos
+#6Retornar el TOP 5 de los productos más vendidos
 #Obtener promedio de la relacion con atributo calificacion para cada producto
 @app.route("/top_5_productos", methods=['GET'])
 def get_top_5_productos():
@@ -160,13 +136,15 @@ def get_top_5_productos():
     return Response(dumps(result.data()),  mimetype='application/json')
     
 
-
+#7 Sugerencia TOP 3
 @app.route("/sugerencia", methods=['GET'])
 def get_sugerencia_calificacion():
+    """
+    Retorna las sugerencias de productos para un comprador dado 
+    """
     db = get_db()
     nombre_producto = request.json['producto']
     nombre_comprador = request.json['comprador']
-    #Traer productos de todos los vendedores que hayan comprado un producto en común
     result = db.run("MATCH (p1:Producto {nombre: $nombre_producto})-[:COMPRADO_POR]->(b:Comprador WHERE b.nombre <>  $nombre_comprador)<-[c2:COMPRADO_POR]-(p2:Producto WHERE p2.nombre <> $nombre_producto)<-[r:RECOMIENDA]-(b) RETURN  0.4*COUNT(c2) + AVG(r.calificacion) as ranking_sugerencia, p2.nombre as name_product LIMIT 3", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador)
     return Response(dumps(result.data()),  mimetype='application/json')
     
