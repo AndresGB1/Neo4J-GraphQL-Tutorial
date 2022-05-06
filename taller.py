@@ -160,28 +160,14 @@ def get_top_5_productos():
     return Response(dumps(result.data()),  mimetype='application/json')
     
 
-# Encontrar otros compradores que han comprado el mismo producto,
-# retornar los productos que han comprado
-@app.route("/otros_compradores", methods=['POST'])
 
-
-#metodo get 
 @app.route("/sugerencia", methods=['GET'])
-def get_sugerencia():
-    db = get_db()
-    nombre_producto = request.json['producto']
-    nombre_comprador = request.json['comprador']
-    result = db.run("MATCH (a:Producto {nombre: $nombre_producto})-[:COMPRADO_POR]->(b:Comprador) WHERE b.nombre <> $nombre_comprador RETURN b.nombre AS nombre", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador)
-    print(result.data())    
-    for r in result:
-        print(r)
-    return Response(dumps(result.data()),  mimetype='application/json')
-
-@app.route("/sugerencia_calificacion", methods=['GET'])
 def get_sugerencia_calificacion():
     db = get_db()
     nombre_producto = request.json['producto']
-    result =  db.run("MATCH (b:Comprador)<-[c:COMPRADO_POR]-(a:Producto {nombre: 'Jean'})<-[r:RECOMIENDA]-(b)  RETURN 0.4*COUNT(c) + AVG(r.calificacion) as ranking_sugerencia", nombre_producto=nombre_producto)
+    nombre_comprador = request.json['comprador']
+    #Traer productos de todos los vendedores que hayan comprado un producto en común
+    result = db.run("MATCH (p1:Producto {nombre: $nombre_producto})-[:COMPRADO_POR]->(b:Comprador WHERE b.nombre <>  $nombre_comprador)<-[c2:COMPRADO_POR]-(p2:Producto WHERE p2.nombre <> $nombre_producto)<-[r:RECOMIENDA]-(b) RETURN  0.4*COUNT(c2) + AVG(r.calificacion) as ranking_sugerencia, p2.nombre as name_product LIMIT 3", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador)
     return Response(dumps(result.data()),  mimetype='application/json')
     
     
