@@ -1,5 +1,4 @@
-# graph
-
-# Integrantes: - Buitrago Paula
+# Integrantes:
+- Buitrago Paula
 - Galvis Felipe 
 - Rincón Manuel 
