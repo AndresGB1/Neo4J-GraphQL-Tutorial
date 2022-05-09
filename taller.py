@@ -65,6 +65,8 @@ def post_vendedor():
     nombre = request.json['nombre']
     db.run("CREATE (a:Vendedor {nombre: $nombre})", nombre=nombre)
     return Response(status=201)
+#postman vendedor
+#{"nombre":"vendedor1"}
 
 #get Vendedores
 @app.route("/vendedores", methods=['GET'])
@@ -88,11 +90,11 @@ def post_producto():
     db = get_db()
     nombre = request.json['nombre']
     categoria = request.json['categoria']
-    vendedor = request.json['vendedor']
-    db.run("CREATE (a:Producto {nombre: $nombre, categoria: $categoria})", nombre=nombre, categoria=categoria)
-    db.run("MATCH (a:Vendedor {nombre: $nombre}) CREATE (a)<-[:VENDIDO_POR]-(b:Producto {nombre: $nombre, categoria: $categoria})", nombre=nombre, categoria=categoria)
+    ned = request.json['vendedor']
+    db.run("MATCH (a:Vendedor {nombre: $ned}) CREATE (a)<-[:VENDIDO_POR]-(b:Producto {categoria: $categoria, nombre: $nombre})", nombre=nombre, categoria=categoria, ned=ned)
     return Response(status=201)
-
+#postman producto
+#{"nombre":"producto1","categoria":"categoria1","vendedor":"vendedor1"}
 #get productos
 @app.route("/productos", methods=['GET'])
 def get_productos():
@@ -111,7 +113,8 @@ def post_comprar():
     nombre_comprador = request.json['comprador']
     db.run("MATCH (a:Producto {nombre: $nombre_producto}), (b:Comprador {nombre: $nombre_comprador}) CREATE (a)-[:COMPRADO_POR]->(b)", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador)
     return Response(status=201)
-
+#postman compra
+#{"producto":"producto1","comprador":"comprador1"}
 #5Recomendar un producto.
 #Un comprador relaciona la RECOMIENDA un producto con atributo calificación siendo este un entero entre 1 y 5.
 #Metodo documentado
@@ -126,17 +129,21 @@ def post_recomendar():
     calificacion = request.json['calificacion']
     db.run("MATCH (a:Producto {nombre: $nombre_producto}), (b:Comprador {nombre: $nombre_comprador}) CREATE (b)-[:RECOMIENDA {calificacion: $calificacion}]->(a)", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador, calificacion=calificacion)
     return Response(status=201)
+#postman recomendar
+#{"comprador":"comprador1","producto":"producto1","calificacion":5}
 
 #6Retornar el TOP 5 de los productos más vendidos
 #Obtener promedio de la relacion con atributo calificacion para cada producto
 @app.route("/top_5_productos", methods=['GET'])
 def get_top_5_productos():
     db = get_db()
-    result = db.run("MATCH (a:Comprador)-[r:RECOMIENDA]->(b:Producto) RETURN b.nombre AS nombre, AVG(r.calificacion) AS promedio ORDER BY promedio DESC LIMIT 5")
+    result = db.run("MATCH (a:Comprador)<-[c:COMPRADO_POR]-(b:Producto)<-[r:RECOMIENDA]-(a) RETURN b.nombre AS nombre, AVG(r.calificacion) AS promedio, count(c) as compras ORDER BY compras DESC, promedio DESC LIMIT 5")
     return Response(dumps(result.data()),  mimetype='application/json')
     
 
 #7 Sugerencia TOP 3
+#ranking_sugerencia = 0.4*cantidad_compras + 0.6*calificacion_promedio 
+
 @app.route("/sugerencia", methods=['GET'])
 def get_sugerencia_calificacion():
     """
@@ -145,11 +152,23 @@ def get_sugerencia_calificacion():
     db = get_db()
     nombre_producto = request.json['producto']
     nombre_comprador = request.json['comprador']
-    result = db.run("MATCH (p1:Producto {nombre: $nombre_producto})-[:COMPRADO_POR]->(b:Comprador WHERE b.nombre <>  $nombre_comprador)<-[c2:COMPRADO_POR]-(p2:Producto WHERE p2.nombre <> $nombre_producto)<-[r:RECOMIENDA]-(b) RETURN  0.4*COUNT(c2) + AVG(r.calificacion) as ranking_sugerencia, p2.nombre as name_product LIMIT 3", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador)
-    return Response(dumps(result.data()),  mimetype='application/json')
+    producto = db.run("MATCH (p1:Producto {nombre: $nombre_producto})-[:COMPRADO_POR]->(b:Comprador WHERE b.nombre <>  $nombre_comprador)<-[c:COMPRADO_POR]-(p2:Producto WHERE p2.nombre <> $nombre_producto)<-[r:RECOMIENDA]-() RETURN  p2.nombre as name_product, AVG(r.calificacion) as calificacion", nombre_producto=nombre_producto, nombre_comprador=nombre_comprador)
+    dict ={}
+    for i in producto.data():
+        dict[i['name_product']] = {'calificacion': i['calificacion'],'compras':n_compras(i['name_product']),'ranking':0.4*n_compras(i['name_product'])+0.6*i['calificacion']}
+
+    #sort by ranking 
+    sorted_dict = sorted(dict.items(), key=lambda kv: kv[1]['ranking'], reverse=True)
+    #retornar los 3 primeros
+    return Response(dumps(sorted_dict[:3]),  mimetype='application/json')
     
     
 
+def n_compras(nombre_producto):
+    """Retorna la cantidad de compras de un producto"""
+    db = get_db()
+    result = db.run("MATCH (a:Producto {nombre: $nombre_producto})-[c:COMPRADO_POR]->(b:Comprador) RETURN count(c) as compras", nombre_producto=nombre_producto)
+    return result.data()[0]['compras']
 
 
 if __name__ == '__main__':
