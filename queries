@@ -1,0 +1,24 @@
+#queries
+1.
+comprador
+{
+"nombre":"comprador1"
+}
+2.
+vendedor
+{"nombre":"vendedor1"}
+3.
+producto
+{"nombre":"tesla model 3","categoria":"transporte","vendedor":"vendedor1"}
+4.
+comprar 
+{"producto":"tesla model 3","comprador":"comprador1"}
+5.
+recomendar
+{"comprador":"comprador1","producto":"tesla model 3","calificacion":4}
+6.
+top_5_productos
+7.
+sugerencia
+{"producto":"Jean","comprador":"Teresa Rincon"}
+{"producto":"Gomitas","comprador":"Fernando Beltran"}
